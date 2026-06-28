@@ -1,0 +1,9 @@
+node_modules/
+client/node_modules/
+client/build/
+database/silah_cms.db
+uploads/*
+!uploads/.gitkeep
+.env
+*.log
+.DS_Store
