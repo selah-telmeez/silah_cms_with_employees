@@ -2087,7 +2087,7 @@ insertGate.run('g4','Gate الاعتماد','p4','لم يفتح');
 console.log('✅ Gates seeded');
 
 // ── ACTIVITY ─────────────────────────────────────────────────────────────────
-const insertAct = db.prepare(`INSERT INTO activity (id,text,type,created_at) VALUES (?,?,?,today())`);
+const insertAct = db.prepare(`INSERT INTO activity (id,text,type,created_at) VALUES (?,?,?,date('now'))`);
 insertAct.run('a1','تم تهيئة قاعدة البيانات بـ 151 موظف من بيانات سلاح التلميذ','success');
 insertAct.run('a2','النظام جاهز — قطاع المحتوى مُحمَّل بالكامل','info');
 
