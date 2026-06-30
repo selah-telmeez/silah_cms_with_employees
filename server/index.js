@@ -41,6 +41,7 @@ app.use('/api/phases',    require('./routes/phases'));
 app.use('/api/gates',     require('./routes/gates'));
 app.use('/api/activity',  require('./routes/activity'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/users',     require('./routes/users'));
 
 // ── Health check ─────────────────────────────────────────
 app.get('/api/health', (req, res) => {

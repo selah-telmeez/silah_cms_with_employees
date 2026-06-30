@@ -1,10 +1,11 @@
 // client/src/components/CMS.jsx
-// Full CMS UI — 7 pages, wired to live API data via props from App.jsx
+// Full CMS UI — 8 pages, i18n (ar/en), wired to live API data via props from App.jsx
 import { useState, useMemo } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
+import { translations, GRADE_KEYS } from '../i18n';
 
 // ── Design tokens ───────────────────────────────────────────────
 const C = {
@@ -16,21 +17,15 @@ const C = {
 const FONT = 'Cairo,sans-serif';
 const MONO = 'Space Mono,monospace';
 
+const STATUS_KEYS = ['لم يبدأ', 'جارٍ', 'في المراجعة', 'مكتمل'];
 const STATUS_COLOR = {
   'لم يبدأ': C.textMuted, 'جارٍ': C.blue, 'في المراجعة': C.orange, 'مكتمل': C.green,
 };
+const PRIORITY_KEYS = ['منخفضة', 'متوسطة', 'عالية'];
 const PRIORITY_COLOR = { 'منخفضة': C.green, 'متوسطة': C.orange, 'عالية': C.red };
+const GATE_KEYS = ['لم يفتح', 'معلق', 'اجتاز', 'مرفوض'];
 const GATE_COLOR = { 'لم يفتح': C.textMuted, 'معلق': C.orange, 'اجتاز': C.green, 'مرفوض': C.red };
-
-const NAV = [
-  { id: 'dashboard', label: 'لوحة التحكم', icon: '📊' },
-  { id: 'tasks', label: 'المهام', icon: '✅' },
-  { id: 'members', label: 'الفريق', icon: '👥' },
-  { id: 'phases', label: 'المراحل', icon: '🗂️' },
-  { id: 'gates', label: 'بوابات الجودة', icon: '🚦' },
-  { id: 'activity', label: 'النشاط', icon: '🕓' },
-  { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
-];
+const ROLE_OPTIONS = ['viewer', 'author', 'reviewer', 'designer', 'coordinator', 'editor', 'admin'];
 
 // ── Small shared UI bits ────────────────────────────────────────
 function Badge({ text, color }) {
@@ -70,7 +65,7 @@ function Modal({ title, onClose, children, width = 480 }) {
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, borderRadius: 16, width: '100%', maxWidth: width,
-        maxHeight: '88vh', overflowY: 'auto', padding: 24, fontFamily: FONT, direction: 'rtl',
+        maxHeight: '88vh', overflowY: 'auto', padding: 24, fontFamily: FONT,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: C.textDark }}>{title}</div>
@@ -102,11 +97,11 @@ const inputStyle = {
 
 function Btn({ children, onClick, variant = 'primary', style, type = 'button', disabled }) {
   const styles = {
-    primary: { background: C.teal, color: 'white' },
-    danger: { background: C.red, color: 'white' },
-    ghost: { background: 'rgba(255,255,255,.1)', color: 'white' },
-    outline: { background: 'white', color: C.teal, border: `1px solid ${C.teal}` },
-    subtle: { background: '#F0F4F8', color: C.textDark },
+    primary:  { background: C.teal, color: 'white' },
+    danger:   { background: C.red, color: 'white' },
+    ghost:    { background: 'rgba(255,255,255,.1)', color: 'white' },
+    outline:  { background: 'white', color: C.teal, border: `1px solid ${C.teal}` },
+    subtle:   { background: '#F0F4F8', color: C.textDark },
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled} style={{
@@ -127,9 +122,9 @@ function EmptyState({ icon, text }) {
 }
 
 // ── Topbar + sidebar shell ──────────────────────────────────────
-function Shell({ page, setPage, totalProg, user, onLogout, onRefresh, children }) {
+function Shell({ page, setPage, totalProg, user, onLogout, onRefresh, lang, setLang, t, navList, children }) {
   return (
-    <div style={{ fontFamily: FONT, direction: 'rtl', minHeight: '100vh', background: C.bg, display: 'flex' }}>
+    <div style={{ fontFamily: FONT, direction: t.dir, minHeight: '100vh', background: C.bg, display: 'flex' }}>
       {/* Sidebar */}
       <div style={{
         width: 220, background: C.navy, minHeight: '100vh', display: 'flex',
@@ -138,15 +133,15 @@ function Shell({ page, setPage, totalProg, user, onLogout, onRefresh, children }
         <div style={{ padding: '20px 18px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
           <div style={{ width: 34, height: 34, background: C.gold, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📚</div>
           <div>
-            <div style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>سلاح التلميذ</div>
-            <div style={{ color: C.textMuted, fontSize: 10 }}>نظام إدارة الإنتاج</div>
+            <div style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>{t.appName}</div>
+            <div style={{ color: C.textMuted, fontSize: 10 }}>{t.appSubtitle}</div>
           </div>
         </div>
         <div style={{ flex: 1, padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {NAV.map(n => (
+          {navList.map(n => (
             <button key={n.id} onClick={() => setPage(n.id)} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-              borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'right',
+              borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: t.dir === 'rtl' ? 'right' : 'left',
               fontFamily: FONT, fontSize: 13, fontWeight: 700,
               background: page === n.id ? 'rgba(255,255,255,.1)' : 'transparent',
               color: page === n.id ? 'white' : C.textMuted,
@@ -156,10 +151,21 @@ function Shell({ page, setPage, totalProg, user, onLogout, onRefresh, children }
           ))}
         </div>
         <div style={{ padding: 14, borderTop: '1px solid rgba(255,255,255,.08)' }}>
-          <div style={{ background: C.teal, color: 'white', borderRadius: 9, padding: '8px 12px', fontSize: 11, fontWeight: 700, textAlign: 'center', marginBottom: 10 }}>
-            الإنجاز الكلي: {totalProg}%
+          {/* Language switch */}
+          <div style={{ display: 'flex', borderRadius: 9, overflow: 'hidden', marginBottom: 10, border: '1px solid rgba(255,255,255,.15)' }}>
+            {['ar', 'en'].map(l => (
+              <button key={l} onClick={() => setLang(l)} style={{
+                flex: 1, padding: '7px 0', border: 'none', cursor: 'pointer', fontFamily: FONT,
+                fontSize: 12, fontWeight: 700,
+                background: lang === l ? C.teal : 'transparent',
+                color: lang === l ? 'white' : C.textMuted,
+              }}>{l === 'ar' ? 'العربية' : 'English'}</button>
+            ))}
           </div>
-          <Btn variant="ghost" onClick={onLogout} style={{ width: '100%' }}>تسجيل الخروج</Btn>
+          <div style={{ background: C.teal, color: 'white', borderRadius: 9, padding: '8px 12px', fontSize: 11, fontWeight: 700, textAlign: 'center', marginBottom: 10 }}>
+            {t.totalProgress}: {totalProg}%
+          </div>
+          <Btn variant="ghost" onClick={onLogout} style={{ width: '100%' }}>{t.logout}</Btn>
         </div>
       </div>
 
@@ -170,11 +176,11 @@ function Shell({ page, setPage, totalProg, user, onLogout, onRefresh, children }
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
         }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: C.textDark }}>
-            {NAV.find(n => n.id === page)?.label}
+            {navList.find(n => n.id === page)?.label}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ color: C.textMuted, fontSize: 12 }}>مرحبًا، {user?.name}</div>
-            <Btn variant="subtle" onClick={onRefresh}>🔄 تحديث</Btn>
+            <div style={{ color: C.textMuted, fontSize: 12 }}>{t.welcome}, {user?.name}</div>
+            <Btn variant="subtle" onClick={onRefresh}>🔄 {t.refresh}</Btn>
           </div>
         </div>
         <div style={{ padding: 24 }}>{children}</div>
@@ -184,35 +190,34 @@ function Shell({ page, setPage, totalProg, user, onLogout, onRefresh, children }
 }
 
 // ── Dashboard page ───────────────────────────────────────────────
-function DashboardPage({ data, totalProg }) {
-  const { tasks, members, phases, phaseProgress, gates, activity } = data;
-  const doneTasks = tasks.filter(t => t.status === 'مكتمل').length;
-  const activeTasks = tasks.filter(t => t.status === 'جارٍ').length;
-  const overdue = tasks.filter(t => t.due_date && t.status !== 'مكتمل' && new Date(t.due_date) < new Date()).length;
+function DashboardPage({ data, totalProg, t, lang }) {
+  const { tasks, members, phases, phaseProgress, activity } = data;
+  const doneTasks = tasks.filter(x => x.status === 'مكتمل').length;
+  const activeTasks = tasks.filter(x => x.status === 'جارٍ').length;
+  const overdue = tasks.filter(x => x.due_date && x.status !== 'مكتمل' && new Date(x.due_date) < new Date()).length;
 
   const phaseChartData = phases.map(p => ({
     name: p.name, progress: phaseProgress[p.id] ?? p.progress ?? 0, color: p.color || C.teal,
   }));
 
-  const statusPie = ['لم يبدأ', 'جارٍ', 'في المراجعة', 'مكتمل'].map(s => ({
-    name: s, value: tasks.filter(t => t.status === s).length, color: STATUS_COLOR[s],
+  const statusPie = STATUS_KEYS.map(s => ({
+    name: t.status[s], value: tasks.filter(x => x.status === s).length, color: STATUS_COLOR[s],
   })).filter(d => d.value > 0);
 
   const upcoming = tasks
-    .filter(t => t.status !== 'مكتمل' && t.due_date)
+    .filter(x => x.status !== 'مكتمل' && x.due_date)
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
     .slice(0, 5);
 
   return (
     <div>
-      {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14, marginBottom: 20 }}>
         {[
-          { l: 'الإنجاز الكلي', v: `${totalProg}%`, c: C.teal },
-          { l: 'المهام المكتملة', v: `${doneTasks}/${tasks.length}`, c: C.green },
-          { l: 'المهام الجارية', v: activeTasks, c: C.blue },
-          { l: 'مهام متأخرة', v: overdue, c: overdue > 0 ? C.red : C.textMuted },
-          { l: 'أعضاء الفريق', v: members.length, c: C.purple },
+          { l: t.dashboard.totalProgress, v: `${totalProg}%`, c: C.teal },
+          { l: t.dashboard.completedTasks, v: `${doneTasks}/${tasks.length}`, c: C.green },
+          { l: t.dashboard.activeTasks, v: activeTasks, c: C.blue },
+          { l: t.dashboard.overdueTasks, v: overdue, c: overdue > 0 ? C.red : C.textMuted },
+          { l: t.dashboard.teamMembers, v: members.length, c: C.purple },
         ].map(k => (
           <Card key={k.l} style={{ padding: '18px 16px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>{k.l}</div>
@@ -223,7 +228,7 @@ function DashboardPage({ data, totalProg }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }}>
         <Card style={{ padding: 20 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>تقدّم المراحل</div>
+          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>{t.dashboard.phaseProgress}</div>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={phaseChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E2EBF3" />
@@ -238,8 +243,8 @@ function DashboardPage({ data, totalProg }) {
         </Card>
 
         <Card style={{ padding: 20 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>توزيع حالة المهام</div>
-          {statusPie.length === 0 ? <EmptyState icon="📭" text="لا توجد مهام بعد" /> : (
+          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>{t.dashboard.taskStatusDist}</div>
+          {statusPie.length === 0 ? <EmptyState icon="📭" text={t.dashboard.noTasks} /> : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={statusPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={{ fontSize: 11, fontFamily: FONT }}>
@@ -255,13 +260,13 @@ function DashboardPage({ data, totalProg }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Card style={{ padding: 20 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>مواعيد قريبة</div>
-          {upcoming.length === 0 ? <EmptyState icon="🗓️" text="لا توجد مواعيد قادمة" /> : (
+          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>{t.dashboard.upcomingDeadlines}</div>
+          {upcoming.length === 0 ? <EmptyState icon="🗓️" text={t.dashboard.noDeadlines} /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {upcoming.map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: 13, color: C.textDark, fontWeight: 600 }}>{t.title}</div>
-                  <Badge text={t.due_date} color={new Date(t.due_date) < new Date() ? C.red : C.textMuted} />
+              {upcoming.map(x => (
+                <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 13, color: C.textDark, fontWeight: 600 }}>{x.title}</div>
+                  <Badge text={x.due_date} color={new Date(x.due_date) < new Date() ? C.red : C.textMuted} />
                 </div>
               ))}
             </div>
@@ -269,8 +274,8 @@ function DashboardPage({ data, totalProg }) {
         </Card>
 
         <Card style={{ padding: 20 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>آخر النشاطات</div>
-          {activity.length === 0 ? <EmptyState icon="🕓" text="لا يوجد نشاط بعد" /> : (
+          <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark, marginBottom: 14 }}>{t.dashboard.recentActivity}</div>
+          {activity.length === 0 ? <EmptyState icon="🕓" text={t.dashboard.noActivity} /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 200, overflowY: 'auto' }}>
               {activity.slice(0, 6).map(a => (
                 <div key={a.id} style={{ fontSize: 12.5, color: C.textDark, lineHeight: 1.6 }}
@@ -285,81 +290,93 @@ function DashboardPage({ data, totalProg }) {
 }
 
 // ── Tasks page ────────────────────────────────────────────────────
-function TaskForm({ initial, members, phases, onSave, onCancel }) {
+function TaskForm({ initial, members, phases, t, lang, onSave, onCancel }) {
   const [f, setF] = useState(initial || {
     title: '', description: '', phase_id: phases[0]?.id || '', assignee_id: '',
-    status: 'لم يبدأ', progress: 0, priority: 'متوسطة', due_date: '', notes: '',
+    status: 'لم يبدأ', progress: 0, priority: 'متوسطة', due_date: '', notes: '', grade_year: '',
   });
   return (
     <div>
-      <Field label="عنوان المهمة">
+      <Field label={t.tasks.formTitle}>
         <input style={inputStyle} value={f.title} onChange={e => setF({ ...f, title: e.target.value })} />
       </Field>
-      <Field label="الوصف">
+      <Field label={t.tasks.formDesc}>
         <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={f.description}
           onChange={e => setF({ ...f, description: e.target.value })} />
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="المرحلة">
+        <Field label={t.tasks.formPhase}>
           <select style={inputStyle} value={f.phase_id} onChange={e => setF({ ...f, phase_id: e.target.value })}>
             {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        <Field label="المسؤول">
+        <Field label={t.tasks.formAssignee}>
           <select style={inputStyle} value={f.assignee_id || ''} onChange={e => setF({ ...f, assignee_id: e.target.value })}>
-            <option value="">— غير محدد —</option>
+            <option value="">{t.tasks.formNoAssignee}</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name_ar || m.name}</option>)}
           </select>
         </Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="الحالة">
+        <Field label={t.tasks.formStatus}>
           <select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}>
-            {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}
+            {STATUS_KEYS.map(s => <option key={s} value={s}>{t.status[s]}</option>)}
           </select>
         </Field>
-        <Field label="الأولوية">
+        <Field label={t.tasks.formPriority}>
           <select style={inputStyle} value={f.priority} onChange={e => setF({ ...f, priority: e.target.value })}>
-            {Object.keys(PRIORITY_COLOR).map(p => <option key={p} value={p}>{p}</option>)}
+            {PRIORITY_KEYS.map(p => <option key={p} value={p}>{t.priority[p]}</option>)}
           </select>
         </Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label={`التقدم (${f.progress}%)`}>
+        <Field label={`${t.tasks.formProgress} (${f.progress}%)`}>
           <input type="range" min={0} max={100} value={f.progress}
             onChange={e => setF({ ...f, progress: +e.target.value })} style={{ width: '100%' }} />
         </Field>
-        <Field label="تاريخ الاستحقاق">
+        <Field label={t.tasks.formDue}>
           <input type="date" style={inputStyle} value={f.due_date || ''} onChange={e => setF({ ...f, due_date: e.target.value })} />
         </Field>
       </div>
-      <Field label="ملاحظات">
+      <Field label={t.tasks.formYear}>
+        <select style={inputStyle} value={f.grade_year || ''} onChange={e => setF({ ...f, grade_year: e.target.value })}>
+          <option value="">{t.tasks.formNoYear}</option>
+          {GRADE_KEYS.map(g => <option key={g} value={g}>{translations[lang]?.grades?.[g] || g}</option>)}
+        </select>
+      </Field>
+      <Field label={t.tasks.formNotes}>
         <textarea style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }} value={f.notes}
           onChange={e => setF({ ...f, notes: e.target.value })} />
       </Field>
       <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-        <Btn onClick={() => onSave(f)} style={{ flex: 1 }}>حفظ</Btn>
-        <Btn variant="subtle" onClick={onCancel} style={{ flex: 1 }}>إلغاء</Btn>
+        <Btn onClick={() => onSave(f)} style={{ flex: 1 }}>{t.save}</Btn>
+        <Btn variant="subtle" onClick={onCancel} style={{ flex: 1 }}>{t.cancel}</Btn>
       </div>
     </div>
   );
 }
 
-function TasksPage({ data, onAddTask, onUpdateTask, onDeleteTask }) {
+function TasksPage({ data, onAddTask, onUpdateTask, onDeleteTask, t, lang }) {
   const { tasks, members, phases } = data;
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPhase, setFilterPhase] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterDept, setFilterDept] = useState('');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null); // null | 'new' | task object
 
   const memberName = id => members.find(m => m.id === id)?.name_ar || members.find(m => m.id === id)?.name || '—';
   const phaseName = id => phases.find(p => p.id === id)?.name || id;
+  const depts = useMemo(() => [...new Set(members.map(m => m.dept_en).filter(Boolean))], [members]);
+  const deptOf = id => members.find(m => m.id === id)?.dept_en;
 
-  const filtered = useMemo(() => tasks.filter(t =>
-    (!filterStatus || t.status === filterStatus) &&
-    (!filterPhase || t.phase_id === filterPhase) &&
-    (!search || t.title.toLowerCase().includes(search.toLowerCase()))
-  ), [tasks, filterStatus, filterPhase, search]);
+  const filtered = useMemo(() => tasks.filter(x =>
+    (!filterStatus || x.status === filterStatus) &&
+    (!filterPhase || x.phase_id === filterPhase) &&
+    (!filterYear || x.grade_year === filterYear) &&
+    (!filterDept || deptOf(x.assignee_id) === filterDept) &&
+    (!search || x.title.toLowerCase().includes(search.toLowerCase()))
+  ), [tasks, filterStatus, filterPhase, filterYear, filterDept, search, members]);
 
   const handleSave = async f => {
     if (f.id) await onUpdateTask(f); else await onAddTask(f);
@@ -369,51 +386,65 @@ function TasksPage({ data, onAddTask, onUpdateTask, onDeleteTask }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input placeholder="بحث في المهام..." value={search} onChange={e => setSearch(e.target.value)}
-          style={{ ...inputStyle, width: 220 }} />
-        <select style={{ ...inputStyle, width: 160 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">كل الحالات</option>
-          {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}
+        <input placeholder={t.tasks.searchPlaceholder} value={search} onChange={e => setSearch(e.target.value)}
+          style={{ ...inputStyle, width: 200 }} />
+        <select style={{ ...inputStyle, width: 150 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">{t.tasks.allStatuses}</option>
+          {STATUS_KEYS.map(s => <option key={s} value={s}>{t.status[s]}</option>)}
         </select>
-        <select style={{ ...inputStyle, width: 180 }} value={filterPhase} onChange={e => setFilterPhase(e.target.value)}>
-          <option value="">كل المراحل</option>
+        <select style={{ ...inputStyle, width: 160 }} value={filterPhase} onChange={e => setFilterPhase(e.target.value)}>
+          <option value="">{t.tasks.allPhases}</option>
           {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        <select style={{ ...inputStyle, width: 160 }} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+          <option value="">{t.tasks.allYears}</option>
+          {GRADE_KEYS.map(g => <option key={g} value={g}>{translations[lang]?.grades?.[g] || g}</option>)}
+        </select>
+        {depts.length > 0 && (
+          <select style={{ ...inputStyle, width: 170 }} value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+            <option value="">{t.tasks.allDepts}</option>
+            {depts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
         <div style={{ flex: 1 }} />
-        <Btn onClick={() => setModal('new')}>+ مهمة جديدة</Btn>
+        <Btn onClick={() => setModal('new')}>+ {t.tasks.newTask}</Btn>
       </div>
 
       <Card>
-        {filtered.length === 0 ? <EmptyState icon="✅" text="لا توجد مهام مطابقة" /> : (
+        {filtered.length === 0 ? <EmptyState icon="✅" text={t.tasks.noTasks} /> : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: `2px solid ${C.border}`, textAlign: 'right' }}>
-                  {['المهمة', 'المرحلة', 'المسؤول', 'الحالة', 'الأولوية', 'التقدم', 'الاستحقاق', ''].map(h => (
+                <tr style={{ borderBottom: `2px solid ${C.border}`, textAlign: t.dir === 'rtl' ? 'right' : 'left' }}>
+                  {[t.tasks.colTask, t.tasks.colPhase, t.tasks.colYear, t.tasks.colAssignee, t.tasks.colStatus,
+                    t.tasks.colPriority, t.tasks.colProgress, t.tasks.colDue, ''].map(h => (
                     <th key={h} style={{ padding: '10px 14px', color: C.textMuted, fontSize: 11, fontWeight: 700 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(t => (
-                  <tr key={t.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: C.textDark }}>{t.title}</td>
-                    <td style={{ padding: '10px 14px', color: C.textMuted }}>{phaseName(t.phase_id)}</td>
-                    <td style={{ padding: '10px 14px', color: C.textMuted }}>{memberName(t.assignee_id)}</td>
-                    <td style={{ padding: '10px 14px' }}><Badge text={t.status} color={STATUS_COLOR[t.status]} /></td>
-                    <td style={{ padding: '10px 14px' }}><Badge text={t.priority} color={PRIORITY_COLOR[t.priority]} /></td>
+                {filtered.map(x => (
+                  <tr key={x.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: C.textDark }}>{x.title}</td>
+                    <td style={{ padding: '10px 14px', color: C.textMuted }}>{phaseName(x.phase_id)}</td>
+                    <td style={{ padding: '10px 14px', color: C.textMuted }}>
+                      {x.grade_year ? (translations[lang]?.grades?.[x.grade_year] || x.grade_year) : '—'}
+                    </td>
+                    <td style={{ padding: '10px 14px', color: C.textMuted }}>{memberName(x.assignee_id)}</td>
+                    <td style={{ padding: '10px 14px' }}><Badge text={t.status[x.status] || x.status} color={STATUS_COLOR[x.status]} /></td>
+                    <td style={{ padding: '10px 14px' }}><Badge text={t.priority[x.priority] || x.priority} color={PRIORITY_COLOR[x.priority]} /></td>
                     <td style={{ padding: '10px 14px', minWidth: 110 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <ProgressBar value={t.progress} />
-                        <span style={{ fontSize: 11, color: C.textMuted, fontFamily: MONO }}>{t.progress}%</span>
+                        <ProgressBar value={x.progress} />
+                        <span style={{ fontSize: 11, color: C.textMuted, fontFamily: MONO }}>{x.progress}%</span>
                       </div>
                     </td>
-                    <td style={{ padding: '10px 14px', color: t.due_date && new Date(t.due_date) < new Date() && t.status !== 'مكتمل' ? C.red : C.textMuted, fontSize: 12 }}>
-                      {t.due_date || '—'}
+                    <td style={{ padding: '10px 14px', color: x.due_date && new Date(x.due_date) < new Date() && x.status !== 'مكتمل' ? C.red : C.textMuted, fontSize: 12 }}>
+                      {x.due_date || '—'}
                     </td>
                     <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                      <button onClick={() => setModal(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, marginLeft: 8 }}>✏️</button>
-                      <button onClick={() => onDeleteTask(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>🗑️</button>
+                      <button onClick={() => setModal(x)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, marginInlineEnd: 8 }}>✏️</button>
+                      <button onClick={() => onDeleteTask(x.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>🗑️</button>
                     </td>
                   </tr>
                 ))}
@@ -424,8 +455,8 @@ function TasksPage({ data, onAddTask, onUpdateTask, onDeleteTask }) {
       </Card>
 
       {modal && (
-        <Modal title={modal === 'new' ? 'مهمة جديدة' : 'تعديل المهمة'} onClose={() => setModal(null)}>
-          <TaskForm initial={modal === 'new' ? null : modal} members={members} phases={phases}
+        <Modal title={modal === 'new' ? t.tasks.newTask : t.tasks.editTask} onClose={() => setModal(null)}>
+          <TaskForm initial={modal === 'new' ? null : modal} members={members} phases={phases} t={t} lang={lang}
             onSave={handleSave} onCancel={() => setModal(null)} />
         </Modal>
       )}
@@ -434,35 +465,41 @@ function TasksPage({ data, onAddTask, onUpdateTask, onDeleteTask }) {
 }
 
 // ── Members page ─────────────────────────────────────────────────
-function MemberForm({ initial, onSave, onCancel }) {
+function MemberForm({ initial, t, onSave, onCancel }) {
   const [f, setF] = useState(initial || {
     name: '', name_ar: '', role_id: '', email: '', phone: '', job_en: '', job_ar: '', notes: '',
+    dept_en: '', dept_ar: '', section_en: '', section_ar: '',
   });
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="الاسم (إنجليزي)"><input style={inputStyle} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
-        <Field label="الاسم (عربي)"><input style={inputStyle} value={f.name_ar || ''} onChange={e => setF({ ...f, name_ar: e.target.value })} /></Field>
+        <Field label={t.members.formNameEn}><input style={inputStyle} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
+        <Field label={t.members.formNameAr}><input style={inputStyle} value={f.name_ar || ''} onChange={e => setF({ ...f, name_ar: e.target.value })} /></Field>
       </div>
-      <Field label="الدور (role_id)"><input style={inputStyle} value={f.role_id} onChange={e => setF({ ...f, role_id: e.target.value })} placeholder="مثل: r_editor" /></Field>
+      <Field label={t.members.formRole}><input style={inputStyle} value={f.role_id} onChange={e => setF({ ...f, role_id: e.target.value })} placeholder="r_editor" /></Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="البريد الإلكتروني"><input style={inputStyle} value={f.email || ''} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
-        <Field label="الهاتف"><input style={inputStyle} value={f.phone || ''} onChange={e => setF({ ...f, phone: e.target.value })} /></Field>
+        <Field label={t.members.formEmail}><input style={inputStyle} value={f.email || ''} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label={t.members.formPhone}><input style={inputStyle} value={f.phone || ''} onChange={e => setF({ ...f, phone: e.target.value })} /></Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="الوظيفة (إنجليزي)"><input style={inputStyle} value={f.job_en || ''} onChange={e => setF({ ...f, job_en: e.target.value })} /></Field>
-        <Field label="الوظيفة (عربي)"><input style={inputStyle} value={f.job_ar || ''} onChange={e => setF({ ...f, job_ar: e.target.value })} /></Field>
+        <Field label={t.members.formJobEn}><input style={inputStyle} value={f.job_en || ''} onChange={e => setF({ ...f, job_en: e.target.value })} /></Field>
+        <Field label={t.members.formJobAr}><input style={inputStyle} value={f.job_ar || ''} onChange={e => setF({ ...f, job_ar: e.target.value })} /></Field>
       </div>
-      <Field label="ملاحظات"><textarea style={{ ...inputStyle, minHeight: 50 }} value={f.notes || ''} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
+      {/* Group / Department assignment */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label={t.members.formDept}><input style={inputStyle} value={f.dept_en || ''} onChange={e => setF({ ...f, dept_en: e.target.value })} placeholder={t.members.formDeptPlaceholder} /></Field>
+        <Field label={t.members.formSection}><input style={inputStyle} value={f.section_en || ''} onChange={e => setF({ ...f, section_en: e.target.value })} placeholder={t.members.formSectionPlaceholder} /></Field>
+      </div>
+      <Field label={t.members.formNotes}><textarea style={{ ...inputStyle, minHeight: 50 }} value={f.notes || ''} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>
       <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-        <Btn onClick={() => onSave(f)} style={{ flex: 1 }}>حفظ</Btn>
-        <Btn variant="subtle" onClick={onCancel} style={{ flex: 1 }}>إلغاء</Btn>
+        <Btn onClick={() => onSave(f)} style={{ flex: 1 }}>{t.save}</Btn>
+        <Btn variant="subtle" onClick={onCancel} style={{ flex: 1 }}>{t.cancel}</Btn>
       </div>
     </div>
   );
 }
 
-function MembersPage({ data, onAddMember, onUpdateMember }) {
+function MembersPage({ data, onAddMember, onUpdateMember, t }) {
   const { members, tasks } = data;
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -483,21 +520,21 @@ function MembersPage({ data, onAddMember, onUpdateMember }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input placeholder="بحث بالاسم..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, width: 220 }} />
+        <input placeholder={t.members.searchPlaceholder} value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, width: 220 }} />
         {depts.length > 0 && (
           <select style={{ ...inputStyle, width: 220 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-            <option value="">كل الأقسام</option>
+            <option value="">{t.members.allDepts}</option>
             {depts.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         )}
         <div style={{ flex: 1 }} />
-        <Btn onClick={() => setModal('new')}>+ عضو جديد</Btn>
+        <Btn onClick={() => setModal('new')}>+ {t.members.newMember}</Btn>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
-        {filtered.length === 0 ? <EmptyState icon="👥" text="لا يوجد أعضاء مطابقون" /> : filtered.map(m => {
-          const taskCount = tasks.filter(t => t.assignee_id === m.id).length;
-          const doneCount = tasks.filter(t => t.assignee_id === m.id && t.status === 'مكتمل').length;
+        {filtered.length === 0 ? <EmptyState icon="👥" text={t.members.noMembers} /> : filtered.map(m => {
+          const taskCount = tasks.filter(x => x.assignee_id === m.id).length;
+          const doneCount = tasks.filter(x => x.assignee_id === m.id && x.status === 'مكتمل').length;
           return (
             <Card key={m.id} style={{ padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -509,10 +546,11 @@ function MembersPage({ data, onAddMember, onUpdateMember }) {
               </div>
               <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {m.dept_ar && <Badge text={m.dept_ar} color={C.purple} />}
+                {m.section_ar && <Badge text={m.section_ar} color={C.blue} />}
                 {m.role_id && <Badge text={m.role_id} color={C.teal} />}
               </div>
               <div style={{ marginTop: 12, fontSize: 11, color: C.textMuted }}>
-                المهام: {doneCount}/{taskCount} مكتملة
+                {t.members.tasksLabel}: {doneCount}/{taskCount} {t.members.completed}
               </div>
               {taskCount > 0 && <div style={{ marginTop: 6 }}><ProgressBar value={taskCount ? (doneCount / taskCount) * 100 : 0} color={C.green} h={6} /></div>}
             </Card>
@@ -521,8 +559,8 @@ function MembersPage({ data, onAddMember, onUpdateMember }) {
       </div>
 
       {modal && (
-        <Modal title={modal === 'new' ? 'عضو جديد' : 'تعديل العضو'} onClose={() => setModal(null)}>
-          <MemberForm initial={modal === 'new' ? null : modal} onSave={handleSave} onCancel={() => setModal(null)} />
+        <Modal title={modal === 'new' ? t.members.newMember : t.members.editMember} onClose={() => setModal(null)}>
+          <MemberForm initial={modal === 'new' ? null : modal} t={t} onSave={handleSave} onCancel={() => setModal(null)} />
         </Modal>
       )}
     </div>
@@ -530,13 +568,13 @@ function MembersPage({ data, onAddMember, onUpdateMember }) {
 }
 
 // ── Phases page ───────────────────────────────────────────────────
-function PhasesPage({ data, onUpdatePhaseProgress }) {
+function PhasesPage({ data, onUpdatePhaseProgress, t }) {
   const { phases, phaseProgress, tasks } = data;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {phases.map(p => {
         const prog = phaseProgress[p.id] ?? p.progress ?? 0;
-        const phaseTasks = tasks.filter(t => t.phase_id === p.id);
+        const phaseTasks = tasks.filter(x => x.phase_id === p.id);
         return (
           <Card key={p.id} style={{ padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -553,36 +591,36 @@ function PhasesPage({ data, onUpdatePhaseProgress }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
               <input type="range" min={0} max={100} value={prog} style={{ flex: 1 }}
                 onChange={e => onUpdatePhaseProgress(p.id, +e.target.value)} />
-              <div style={{ fontSize: 12, color: C.textMuted }}>{phaseTasks.length} مهمة</div>
+              <div style={{ fontSize: 12, color: C.textMuted }}>{phaseTasks.length} {t.phases.taskCount}</div>
             </div>
           </Card>
         );
       })}
-      {phases.length === 0 && <EmptyState icon="🗂️" text="لا توجد مراحل" />}
+      {phases.length === 0 && <EmptyState icon="🗂️" text={t.phases.noPhases} />}
     </div>
   );
 }
 
 // ── Gates page ────────────────────────────────────────────────────
-function GatesPage({ data, onUpdateGate }) {
-  const { gates, phases, members } = data;
+function GatesPage({ data, onUpdateGate, t }) {
+  const { gates, phases } = data;
   const phaseName = id => phases.find(p => p.id === id)?.name || id;
   const gateList = Object.values(gates);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
-      {gateList.length === 0 ? <EmptyState icon="🚦" text="لا توجد بوابات جودة" /> : gateList.map(g => (
+      {gateList.length === 0 ? <EmptyState icon="🚦" text={t.gates.noGates} /> : gateList.map(g => (
         <Card key={g.id} style={{ padding: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 14, color: C.textDark }}>{g.name}</div>
               <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{phaseName(g.phase_id)}</div>
             </div>
-            <Badge text={g.status} color={GATE_COLOR[g.status] || C.textMuted} />
+            <Badge text={t.gateStatus[g.status] || g.status} color={GATE_COLOR[g.status] || C.textMuted} />
           </div>
-          {g.approved_date && <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>اعتُمد بتاريخ: {g.approved_date}</div>}
+          {g.approved_date && <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>{t.gates.approvedOn}: {g.approved_date}</div>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-            {Object.keys(GATE_COLOR).map(s => (
+            {GATE_KEYS.map(s => (
               <button key={s} onClick={() => onUpdateGate(g.id, {
                 status: s,
                 approved_date: s === 'اجتاز' ? new Date().toISOString().split('T')[0] : g.approved_date,
@@ -590,7 +628,7 @@ function GatesPage({ data, onUpdateGate }) {
                 fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 999,
                 border: `1px solid ${GATE_COLOR[s]}`, background: g.status === s ? GATE_COLOR[s] : 'white',
                 color: g.status === s ? 'white' : GATE_COLOR[s], cursor: 'pointer', fontFamily: FONT,
-              }}>{s}</button>
+              }}>{t.gateStatus[s]}</button>
             ))}
           </div>
         </Card>
@@ -600,7 +638,7 @@ function GatesPage({ data, onUpdateGate }) {
 }
 
 // ── Activity page ─────────────────────────────────────────────────
-function ActivityPage({ data, onAddActivity, user }) {
+function ActivityPage({ data, onAddActivity, t }) {
   const { activity } = data;
   const [text, setText] = useState('');
 
@@ -615,12 +653,12 @@ function ActivityPage({ data, onAddActivity, user }) {
   return (
     <div>
       <Card style={{ padding: 16, marginBottom: 16, display: 'flex', gap: 10 }}>
-        <input style={{ ...inputStyle, flex: 1 }} placeholder="أضف ملاحظة أو نشاطًا..." value={text}
+        <input style={{ ...inputStyle, flex: 1 }} placeholder={t.activityPage.addPlaceholder} value={text}
           onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
-        <Btn onClick={submit}>إضافة</Btn>
+        <Btn onClick={submit}>{t.add}</Btn>
       </Card>
       <Card style={{ padding: 4 }}>
-        {activity.length === 0 ? <EmptyState icon="🕓" text="لا يوجد نشاط مسجل بعد" /> : (
+        {activity.length === 0 ? <EmptyState icon="🕓" text={t.activityPage.noActivity} /> : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {activity.map(a => (
               <div key={a.id} style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -638,17 +676,142 @@ function ActivityPage({ data, onAddActivity, user }) {
   );
 }
 
-// ── Settings page ─────────────────────────────────────────────────
-function SettingsPage({ user }) {
+// ── Users page (admin only) ────────────────────────────────────────
+function UserForm({ initial, t, onSave, onCancel }) {
+  const isEdit = !!initial;
+  const [f, setF] = useState(initial || { username: '', password: '', name: '', email: '', role: 'viewer' });
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setErr(''); setBusy(true);
+    const res = await onSave(f);
+    setBusy(false);
+    if (!res?.ok) setErr(res?.error || 'error');
+  };
+
   return (
-    <div style={{ maxWidth: 460 }}>
+    <div>
+      <Field label={t.users.formUsername}>
+        <input style={inputStyle} value={f.username} disabled={isEdit}
+          onChange={e => setF({ ...f, username: e.target.value })} />
+      </Field>
+      <Field label={isEdit ? t.users.formPasswordEdit : t.users.formPassword}>
+        <input type="password" style={inputStyle} value={f.password || ''}
+          onChange={e => setF({ ...f, password: e.target.value })} />
+      </Field>
+      <Field label={t.users.formName}>
+        <input style={inputStyle} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} />
+      </Field>
+      <Field label={t.users.formEmail}>
+        <input style={inputStyle} value={f.email || ''} onChange={e => setF({ ...f, email: e.target.value })} />
+      </Field>
+      <Field label={t.users.formRole}>
+        <select style={inputStyle} value={f.role} onChange={e => setF({ ...f, role: e.target.value })}>
+          {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </Field>
+      {err && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{t.users.errorPrefix} {err}</div>}
+      <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+        <Btn onClick={submit} disabled={busy} style={{ flex: 1 }}>{t.save}</Btn>
+        <Btn variant="subtle" onClick={onCancel} style={{ flex: 1 }}>{t.cancel}</Btn>
+      </div>
+    </div>
+  );
+}
+
+function UsersPage({ data, user, onAddUser, onUpdateUser, onDeleteUser, t }) {
+  const isAdmin = user?.role === 'admin';
+  const [modal, setModal] = useState(null);
+
+  if (!isAdmin) {
+    return <EmptyState icon="🔒" text={t.users.adminOnly} />;
+  }
+
+  const users = data.users || [];
+
+  const handleSave = async f => {
+    const res = f.id ? await onUpdateUser(f) : await onAddUser(f);
+    if (res?.ok) setModal(null);
+    return res;
+  };
+
+  const handleDeactivate = async u => {
+    if (u.id === user.id) { alert(t.users.cannotDeleteSelf); return; }
+    await onDeleteUser(u.id);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Btn onClick={() => setModal('new')}>+ {t.users.newUser}</Btn>
+      </div>
+      <Card>
+        {users.length === 0 ? <EmptyState icon="👤" text={t.users.noUsers} /> : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${C.border}`, textAlign: t.dir === 'rtl' ? 'right' : 'left' }}>
+                  {[t.users.colUsername, t.users.colName, t.users.colEmail, t.users.colRole, t.users.colStatus, ''].map(h => (
+                    <th key={h} style={{ padding: '10px 14px', color: C.textMuted, fontSize: 11, fontWeight: 700 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: C.textDark, fontFamily: MONO }}>{u.username}</td>
+                    <td style={{ padding: '10px 14px', color: C.textDark }}>{u.name}</td>
+                    <td style={{ padding: '10px 14px', color: C.textMuted }}>{u.email || '—'}</td>
+                    <td style={{ padding: '10px 14px' }}><Badge text={u.role} color={C.purple} /></td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <Badge text={u.is_active ? t.users.active : t.users.inactive} color={u.is_active ? C.green : C.textMuted} />
+                    </td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => setModal(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, marginInlineEnd: 8 }}>✏️</button>
+                      {u.is_active ? (
+                        <button onClick={() => handleDeactivate(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>🚫</button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {modal && (
+        <Modal title={modal === 'new' ? t.users.newUser : t.users.editUser} onClose={() => setModal(null)}>
+          <UserForm initial={modal === 'new' ? null : modal} t={t} onSave={handleSave} onCancel={() => setModal(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── Settings page ─────────────────────────────────────────────────
+function SettingsPage({ user, lang, setLang, t }) {
+  return (
+    <div style={{ maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card style={{ padding: 22 }}>
-        <div style={{ fontWeight: 800, fontSize: 15, color: C.textDark, marginBottom: 16 }}>الملف الشخصي</div>
-        <Field label="الاسم"><input style={inputStyle} value={user?.name || ''} disabled /></Field>
-        <Field label="اسم المستخدم"><input style={inputStyle} value={user?.username || ''} disabled /></Field>
-        <Field label="الدور"><input style={inputStyle} value={user?.role || ''} disabled /></Field>
-        <div style={{ fontSize: 11, color: C.textMuted, marginTop: 10 }}>
-          لتغيير كلمة المرور، تواصل مع مسؤول النظام.
+        <div style={{ fontWeight: 800, fontSize: 15, color: C.textDark, marginBottom: 16 }}>{t.settings.title}</div>
+        <Field label={t.settings.name}><input style={inputStyle} value={user?.name || ''} disabled /></Field>
+        <Field label={t.settings.username}><input style={inputStyle} value={user?.username || ''} disabled /></Field>
+        <Field label={t.settings.role}><input style={inputStyle} value={user?.role || ''} disabled /></Field>
+        <div style={{ fontSize: 11, color: C.textMuted, marginTop: 10 }}>{t.settings.passwordNote}</div>
+      </Card>
+      <Card style={{ padding: 22 }}>
+        <div style={{ fontWeight: 800, fontSize: 15, color: C.textDark, marginBottom: 6 }}>{t.settings.language}</div>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 14 }}>{t.settings.languageNote}</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {['ar', 'en'].map(l => (
+            <button key={l} onClick={() => setLang(l)} style={{
+              flex: 1, padding: '10px 0', borderRadius: 9, cursor: 'pointer', fontFamily: FONT,
+              fontSize: 13, fontWeight: 700, border: `1px solid ${lang === l ? C.teal : C.border}`,
+              background: lang === l ? C.teal : 'white', color: lang === l ? 'white' : C.textDark,
+            }}>{l === 'ar' ? 'العربية' : 'English'}</button>
+          ))}
         </div>
       </Card>
     </div>
@@ -659,9 +822,30 @@ function SettingsPage({ user }) {
 export default function CMS({ data, user, onLogout, onRefresh,
   onUpdateTask, onAddTask, onDeleteTask,
   onAddMember, onUpdateMember,
-  onUpdatePhaseProgress, onAddActivity, onUpdateGate }) {
+  onUpdatePhaseProgress, onAddActivity, onUpdateGate,
+  onAddUser, onUpdateUser, onDeleteUser }) {
 
   const [page, setPage] = useState('dashboard');
+  const [lang, setLang] = useState(() => localStorage.getItem('cms_lang') || 'ar');
+
+  const setLangPersist = l => { setLang(l); try { localStorage.setItem('cms_lang', l); } catch (e) {} };
+
+  const t = translations[lang] || translations.ar;
+
+  const isAdmin = user?.role === 'admin';
+  const navList = useMemo(() => {
+    const base = [
+      { id: 'dashboard', label: t.nav.dashboard, icon: '📊' },
+      { id: 'tasks',      label: t.nav.tasks,      icon: '✅' },
+      { id: 'members',    label: t.nav.members,    icon: '👥' },
+      { id: 'phases',     label: t.nav.phases,     icon: '🗂️' },
+      { id: 'gates',      label: t.nav.gates,      icon: '🚦' },
+      { id: 'activity',   label: t.nav.activity,   icon: '🕓' },
+      { id: 'settings',   label: t.nav.settings,   icon: '⚙️' },
+    ];
+    if (isAdmin) base.push({ id: 'users', label: t.nav.users, icon: '👤' });
+    return base;
+  }, [t, isAdmin]);
 
   const totalProg = useMemo(() => {
     const vals = Object.values(data.phaseProgress);
@@ -670,18 +854,22 @@ export default function CMS({ data, user, onLogout, onRefresh,
   }, [data.phaseProgress]);
 
   return (
-    <Shell page={page} setPage={setPage} totalProg={totalProg} user={user} onLogout={onLogout} onRefresh={onRefresh}>
-      {page === 'dashboard' && <DashboardPage data={data} totalProg={totalProg} />}
+    <Shell page={page} setPage={setPage} totalProg={totalProg} user={user} onLogout={onLogout}
+      onRefresh={onRefresh} lang={lang} setLang={setLangPersist} t={t} navList={navList}>
+      {page === 'dashboard' && <DashboardPage data={data} totalProg={totalProg} t={t} lang={lang} />}
       {page === 'tasks' && (
-        <TasksPage data={data} onAddTask={onAddTask} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} />
+        <TasksPage data={data} onAddTask={onAddTask} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} t={t} lang={lang} />
       )}
       {page === 'members' && (
-        <MembersPage data={data} onAddMember={onAddMember} onUpdateMember={onUpdateMember} />
+        <MembersPage data={data} onAddMember={onAddMember} onUpdateMember={onUpdateMember} t={t} />
       )}
-      {page === 'phases' && <PhasesPage data={data} onUpdatePhaseProgress={onUpdatePhaseProgress} />}
-      {page === 'gates' && <GatesPage data={data} onUpdateGate={onUpdateGate} />}
-      {page === 'activity' && <ActivityPage data={data} onAddActivity={onAddActivity} user={user} />}
-      {page === 'settings' && <SettingsPage user={user} />}
+      {page === 'phases' && <PhasesPage data={data} onUpdatePhaseProgress={onUpdatePhaseProgress} t={t} />}
+      {page === 'gates' && <GatesPage data={data} onUpdateGate={onUpdateGate} t={t} />}
+      {page === 'activity' && <ActivityPage data={data} onAddActivity={onAddActivity} t={t} />}
+      {page === 'users' && (
+        <UsersPage data={data} user={user} onAddUser={onAddUser} onUpdateUser={onUpdateUser} onDeleteUser={onDeleteUser} t={t} />
+      )}
+      {page === 'settings' && <SettingsPage user={user} lang={lang} setLang={setLangPersist} t={t} />}
     </Shell>
   );
 }

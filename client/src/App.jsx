@@ -8,6 +8,7 @@ import {
   getPhases, updatePhaseProgress,
   getGates, updateGate,
   getActivity, addActivity,
+  getUsers, createUser, updateUser, deleteUser,
 } from './api';
 
 // ── Import the CMS component (your uploaded file logic, adapted)
@@ -24,14 +25,18 @@ export default function App() {
     if (!user) return;
     setLoading(true);
     try {
-      const [dash, tasks, members, phases, gates, activity] = await Promise.all([
+      const calls = [
         getDashboard(),
         getTasks(),
         getMembers(),
         getPhases(),
         getGates(),
         getActivity(30),
-      ]);
+      ];
+      // Only admins are authorized to list users — avoid a guaranteed 403 for everyone else
+      if (user.role === 'admin') calls.push(getUsers());
+
+      const [dash, tasks, members, phases, gates, activity, users] = await Promise.all(calls);
 
       // Shape data to match the CMS component's expected format
       const phaseProgress = {};
@@ -48,6 +53,7 @@ export default function App() {
         gates:         gatesMap,
         activity:      activity.data,
         summary:       dash.data,
+        users:         users ? users.data : [],
       });
     } catch (e) {
       setError('خطأ في تحميل البيانات');
@@ -116,6 +122,37 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
+  // ── Users (admin only) ────────────────────────────────────
+  const handleAddUser = async u => {
+    try {
+      const r = await createUser(u);
+      setData(d => ({ ...d, users: [r.data, ...d.users] }));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.response?.data?.error || 'حدث خطأ' };
+    }
+  };
+
+  const handleUpdateUser = async u => {
+    try {
+      const r = await updateUser(u.id, u);
+      setData(d => ({ ...d, users: d.users.map(x => x.id === u.id ? r.data : x) }));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.response?.data?.error || 'حدث خطأ' };
+    }
+  };
+
+  const handleDeleteUser = async id => {
+    try {
+      await deleteUser(id);
+      setData(d => ({ ...d, users: d.users.map(x => x.id === id ? { ...x, is_active: 0 } : x) }));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.response?.data?.error || 'حدث خطأ' };
+    }
+  };
+
   // ── Render ───────────────────────────────────────────────
   if (authLoading) {
     return (
@@ -164,6 +201,9 @@ export default function App() {
       onUpdatePhaseProgress={handleUpdatePhaseProgress}
       onAddActivity={handleAddActivity}
       onUpdateGate={handleUpdateGate}
+      onAddUser={handleAddUser}
+      onUpdateUser={handleUpdateUser}
+      onDeleteUser={handleDeleteUser}
     />
   );
 }

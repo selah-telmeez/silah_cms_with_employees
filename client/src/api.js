@@ -59,4 +59,10 @@ export const updateGate = (id, d)  => api.put(`/gates/${id}`, d);
 export const getActivity  = (limit) => api.get('/activity', { params: { limit } });
 export const addActivity  = (data)  => api.post('/activity', data);
 
+// ── Users (admin only) ───────────────────────────────────
+export const getUsers    = ()       => api.get('/users');
+export const createUser  = (data)   => api.post('/users', data);
+export const updateUser  = (id, d)  => api.put(`/users/${id}`, d);
+export const deleteUser  = (id)     => api.delete(`/users/${id}`);
+
 export default api;
